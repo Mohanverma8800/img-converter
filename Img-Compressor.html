@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Compressor & PDF Tools</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            color: #fff;
+        }
+
+        .upload-section, .controls, .preview-section, .pdf-tools {
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-label, #compressBtn, #convertToPdfBtn, #mergePdfBtn, #splitPdfBtn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #ff6f61;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+        }
+
+        .upload-label:hover, #compressBtn:hover, #convertToPdfBtn:hover, #mergePdfBtn:hover, #splitPdfBtn:hover {
+            background: #ff3b2f;
+        }
+
+        #imageInput, #pdfInput, #pdfMergeInput, #pdfSplitInput {
+            display: none;
+        }
+
+        #imagePreview {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .pdf-tools {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .pdf-tools button {
+            width: 100%;
+        }
+
+        .download-link {
+            margin-top: 1rem;
+            display: inline-block;
+            padding: 10px 20px;
+            background: #17a2b8;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+
+        .download-link:hover {
+            background: #138496;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Compressor & PDF Tools</h1>
+
+        <!-- Image Compressor Section -->
+        <div class="upload-section">
+            <input type="file" id="imageInput" accept="image/*">
+            <label for="imageInput" class="upload-label">Upload Image</label>
+        </div>
+        <div class="preview-section">
+            <img id="imagePreview" src="#" alt="Image Preview">
+        </div>
+        <div class="controls">
+            <label for="quality">Quality:</label>
+            <input type="range" id="quality" min="0" max="1" step="0.1" value="0.8">
+            <span id="qualityValue">0.8</span>
+        </div>
+        <button id="compressBtn">Compress Image</button>
+        <a id="downloadImageLink" class="download-link hidden" download="compressed_image.jpg">Download Compressed Image</a>
+
+        <!-- PDF Tools Section -->
+        <div class="pdf-tools">
+            <input type="file" id="pdfInput" accept="application/pdf">
+            <button id="convertToPdfBtn">Convert Image to PDF</button>
+
+            <input type="file" id="pdfMergeInput" accept="application/pdf" multiple>
+            <button id="mergePdfBtn">Merge PDFs</button>
+
+            <input type="file" id="pdfSplitInput" accept="application/pdf">
+            <button id="splitPdfBtn">Split PDF</button>
+        </div>
+    </div>
+
+    <!-- PDF-LIB Library -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script>
+        // Image Compression Logic
+        document.getElementById('imageInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('imagePreview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('quality').addEventListener('input', function() {
+            document.getElementById('qualityValue').textContent = this.value;
+        });
+
+        document.getElementById('compressBtn').addEventListener('click', function() {
+            const img = document.getElementById('imagePreview');
+            const quality = parseFloat(document.getElementById('quality').value);
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            ctx.drawImage(img, 0, 0);
+
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const downloadLink = document.getElementById('downloadImageLink');
+                downloadLink.href = url;
+                downloadLink.classList.remove('hidden');
+            }, 'image/jpeg', quality);
+        });
+
+        // PDF Conversion Logic
+        document.getElementById('convertToPdfBtn').addEventListener('click', async function() {
+            const img = document.getElementById('imagePreview');
+            if (!img.src || img.src === "#") {
+                alert("Please upload an image first.");
+                return;
+            }
+
+            const { PDFDocument } = PDFLib;
+            const pdfDoc = await PDFDocument.create();
+            const imgBlob = await fetch(img.src).then(res => res.blob());
+            const imgBytes = await imgBlob.arrayBuffer();
+            const pdfImage = await pdfDoc.embedJpg(imgBytes);
+
+            const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
+            page.drawImage(pdfImage, {
+                x: 0,
+                y: 0,
+                width: pdfImage.width,
+                height: pdfImage.height,
+            });
+
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'converted_image.pdf';
+            link.click();
+        });
+
+        // PDF Merge Logic
+        document.getElementById('mergePdfBtn').addEventListener('click', async function() {
+            const files = document.getElementById('pdfMergeInput').files;
+            if (files.length < 2) {
+                alert("Please select at least 2 PDFs to merge.");
+                return;
+            }
+
+            const { PDFDocument } = PDFLib;
+            const mergedPdf = await PDFDocument.create();
+
+            for (let file of files) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                copiedPages.forEach(page => mergedPdf.addPage(page));
+            }
+
+            const pdfBytes = await mergedPdf.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'merged.pdf';
+            link.click();
+        });
+
+        // PDF Split Logic
+        document.getElementById('splitPdfBtn').addEventListener('click', async function() {
+            const file = document.getElementById('pdfSplitInput').files[0];
+            if (!file) {
+                alert("Please upload a PDF to split.");
+                return;
+            }
+
+            const { PDFDocument } = PDFLib;
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+            for (let i = 0; i < pdfDoc.getPageCount(); i++) {
+                const newPdf = await PDFDocument.create();
+                const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
+                newPdf.addPage(copiedPage);
+
+                const pdfBytes = await newPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `split_page_${i + 1}.pdf`;
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
